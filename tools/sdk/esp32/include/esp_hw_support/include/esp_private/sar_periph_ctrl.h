@@ -66,16 +66,6 @@ void sar_periph_ctrl_pwdet_power_acquire(void);
 void sar_periph_ctrl_pwdet_power_release(void);
 
 /**
- * @brief Enable SAR power when system wakes up
- */
-void sar_periph_ctrl_power_enable(void);
-
-/**
- * @brief Disable SAR power when system goes to sleep
- */
-void sar_periph_ctrl_power_disable(void);
-
-/**
  * @brief Acquire the temperature sensor power
  */
 void temperature_sensor_power_acquire(void);
@@ -102,6 +92,15 @@ int16_t temp_sensor_get_raw_value(bool *range_changed);
  */
 void temp_sensor_sync_tsens_idx(int tsens_idx);
 
+/**
+ * @brief Enable SAR power when system wakes up
+ */
+void sar_periph_ctrl_power_enable(void);
+
+/**
+ * @brief Disable SAR power when system goes to sleep
+ */
+void sar_periph_ctrl_power_disable(void);
 
 #ifdef __cplusplus
 }

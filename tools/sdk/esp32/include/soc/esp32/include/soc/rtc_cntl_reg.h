@@ -1,23 +1,10 @@
 /*
- * SPDX-FileCopyrightText: 2015-2022 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2015-2023 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 #ifndef _SOC_RTC_CNTL_REG_H_
 #define _SOC_RTC_CNTL_REG_H_
-
-/* The value that needs to be written to RTC_CNTL_WDT_WKEY to write-enable the wdt registers */
-#define RTC_CNTL_WDT_WKEY_VALUE 0x50D83AA1
-
-/* Possible values for RTC_CNTL_WDT_CPU_RESET_LENGTH and RTC_CNTL_WDT_SYS_RESET_LENGTH */
-#define RTC_WDT_RESET_LENGTH_100_NS    0
-#define RTC_WDT_RESET_LENGTH_200_NS    1
-#define RTC_WDT_RESET_LENGTH_300_NS    2
-#define RTC_WDT_RESET_LENGTH_400_NS    3
-#define RTC_WDT_RESET_LENGTH_500_NS    4
-#define RTC_WDT_RESET_LENGTH_800_NS    5
-#define RTC_WDT_RESET_LENGTH_1600_NS   6
-#define RTC_WDT_RESET_LENGTH_3200_NS   7
 
 #include "soc.h"
 #define RTC_CNTL_OPTIONS0_REG          (DR_REG_RTCCNTL_BASE + 0x0)
@@ -892,10 +879,6 @@
 #define RTC_CNTL_SOC_CLK_SEL_M  ((RTC_CNTL_SOC_CLK_SEL_V)<<(RTC_CNTL_SOC_CLK_SEL_S))
 #define RTC_CNTL_SOC_CLK_SEL_V  0x3
 #define RTC_CNTL_SOC_CLK_SEL_S  27
-#define RTC_CNTL_SOC_CLK_SEL_XTL    0
-#define RTC_CNTL_SOC_CLK_SEL_PLL    1
-#define RTC_CNTL_SOC_CLK_SEL_8M     2
-#define RTC_CNTL_SOC_CLK_SEL_APLL   3
 /* RTC_CNTL_CK8M_FORCE_PU : R/W ;bitpos:[26] ;default: 1'd0 ; */
 /*description: CK8M force power up*/
 #define RTC_CNTL_CK8M_FORCE_PU  (BIT(26))

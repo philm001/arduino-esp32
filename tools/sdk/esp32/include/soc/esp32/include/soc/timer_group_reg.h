@@ -1,38 +1,16 @@
-// Copyright 2015-2016 Espressif Systems (Shanghai) PTE LTD
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
+/**
+ * SPDX-FileCopyrightText: 2021-2023 Espressif Systems (Shanghai) CO LTD
+ *
+ *  SPDX-License-Identifier: Apache-2.0
+ */
 
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-#ifndef __TIMG_REG_H__
-#define __TIMG_REG_H__
+#pragma once
+
 #include "soc.h"
 
-/* The value that needs to be written to TIMG_WDT_WKEY to write-enable the wdt registers */
-#define TIMG_WDT_WKEY_VALUE 0x50D83AA1
-
-/* Possible values for TIMG_WDT_STGx */
-#define TIMG_WDT_STG_SEL_OFF 0
-#define TIMG_WDT_STG_SEL_INT 1
-#define TIMG_WDT_STG_SEL_RESET_CPU 2
-#define TIMG_WDT_STG_SEL_RESET_SYSTEM 3
-
-/* Possible values for TIMG_WDT_CPU_RESET_LENGTH and TIMG_WDT_SYS_RESET_LENGTH */
-#define TIMG_WDT_RESET_LENGTH_100_NS    0
-#define TIMG_WDT_RESET_LENGTH_200_NS    1
-#define TIMG_WDT_RESET_LENGTH_300_NS    2
-#define TIMG_WDT_RESET_LENGTH_400_NS    3
-#define TIMG_WDT_RESET_LENGTH_500_NS    4
-#define TIMG_WDT_RESET_LENGTH_800_NS    5
-#define TIMG_WDT_RESET_LENGTH_1600_NS   6
-#define TIMG_WDT_RESET_LENGTH_3200_NS   7
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define REG_TIMG_BASE(i)       (DR_REG_TIMERGROUP0_BASE + i*0x1000)
 #define TIMG_T0CONFIG_REG(i)          (REG_TIMG_BASE(i) + 0x0000)
@@ -669,7 +647,6 @@
 #define TIMG_CLK_EN_V  0x1
 #define TIMG_CLK_EN_S  31
 
-
-
-
-#endif /*__TIMG_REG_H__ */
+#ifdef __cplusplus
+}
+#endif

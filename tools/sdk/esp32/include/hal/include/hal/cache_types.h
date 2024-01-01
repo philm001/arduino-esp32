@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2010-2023 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2010-2022 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -11,6 +11,12 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+typedef enum {
+    CACHE_TYPE_DATA,
+    CACHE_TYPE_INSTRUCTION,
+    CACHE_TYPE_ALL  //This means both ICache and DCache will be used. On some chips, I/D are controlled by a shared Cache. Also use this enum under this condition. See `SOC_SHARED_IDCACHE_SUPPORTED`.
+} cache_type_t;
 
 /**
  * @brief Ibuses and Dbuses.

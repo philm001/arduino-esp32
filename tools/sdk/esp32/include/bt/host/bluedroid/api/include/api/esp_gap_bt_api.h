@@ -1,16 +1,8 @@
-// Copyright 2015-2016 Espressif Systems (Shanghai) PTE LTD
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+ * SPDX-FileCopyrightText: 2015-2023 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
 #ifndef __ESP_GAP_BT_API_H__
 #define __ESP_GAP_BT_API_H__
@@ -99,7 +91,35 @@ typedef struct {
 
 typedef uint8_t esp_bt_eir_type_t;
 
+/* ACL Packet Types */
+#define ESP_BT_ACL_PKT_TYPES_MASK_DM1           0x0008
+#define ESP_BT_ACL_PKT_TYPES_MASK_DH1           0x0010
+#define ESP_BT_ACL_PKT_TYPES_MASK_DM3           0x0400
+#define ESP_BT_ACL_PKT_TYPES_MASK_DH3           0x0800
+#define ESP_BT_ACL_PKT_TYPES_MASK_DM5           0x4000
+#define ESP_BT_ACL_PKT_TYPES_MASK_DH5           0x8000
+#define ESP_BT_ACL_PKT_TYPES_MASK_NO_2_DH1      0x0002
+#define ESP_BT_ACL_PKT_TYPES_MASK_NO_3_DH1      0x0004
+#define ESP_BT_ACL_PKT_TYPES_MASK_NO_2_DH3      0x0100
+#define ESP_BT_ACL_PKT_TYPES_MASK_NO_3_DH3      0x0200
+#define ESP_BT_ACL_PKT_TYPES_MASK_NO_2_DH5      0x1000
+#define ESP_BT_ACL_PKT_TYPES_MASK_NO_3_DH5      0x2000
 
+// DM1 cann not be disabled. All options are mandatory to include DM1.
+#define ESP_BT_ACL_DM1_ONLY     (ESP_BT_ACL_PKT_TYPES_MASK_DM1 | 0x330e)         /* 0x330e */
+#define ESP_BT_ACL_DH1_ONLY     (ESP_BT_ACL_PKT_TYPES_MASK_DH1 | 0x330e)         /* 0x331e */
+#define ESP_BT_ACL_DM3_ONLY     (ESP_BT_ACL_PKT_TYPES_MASK_DM3 | 0x330e)         /* 0x370e */
+#define ESP_BT_ACL_DH3_ONLY     (ESP_BT_ACL_PKT_TYPES_MASK_DH3 | 0x330e)         /* 0x3b0e */
+#define ESP_BT_ACL_DM5_ONLY     (ESP_BT_ACL_PKT_TYPES_MASK_DM5 | 0x330e)         /* 0x730e */
+#define ESP_BT_ACL_DH5_ONLY     (ESP_BT_ACL_PKT_TYPES_MASK_DH5 | 0x330e)         /* 0xb30e */
+#define ESP_BT_ACL_2_DH1_ONLY   (~ESP_BT_ACL_PKT_TYPES_MASK_NO_2_DH1 & 0x330e)   /* 0x330c */
+#define ESP_BT_ACL_3_DH1_ONLY   (~ESP_BT_ACL_PKT_TYPES_MASK_NO_3_DH1 & 0x330e)   /* 0x330a */
+#define ESP_BT_ACL_2_DH3_ONLY   (~ESP_BT_ACL_PKT_TYPES_MASK_NO_2_DH3 & 0x330e)   /* 0x320e */
+#define ESP_BT_ACL_3_DH3_ONLY   (~ESP_BT_ACL_PKT_TYPES_MASK_NO_3_DH3 & 0x330e)   /* 0x310e */
+#define ESP_BT_ACL_2_DH5_ONLY   (~ESP_BT_ACL_PKT_TYPES_MASK_NO_2_DH5 & 0x330e)   /* 0x230e */
+#define ESP_BT_ACL_3_DH5_ONLY   (~ESP_BT_ACL_PKT_TYPES_MASK_NO_3_DH5 & 0x330e)   /* 0x130e */
+
+typedef uint16_t esp_bt_acl_pkt_type_t;
 
 /* ESP_BT_EIR_FLAG bit definition */
 #define ESP_BT_EIR_FLAG_LIMIT_DISC         (0x01 << 0)
@@ -114,6 +134,7 @@ typedef struct {
     bool                    fec_required;           /*!< FEC is required or not, true by default */
     bool                    include_txpower;        /*!< EIR data include TX power, false by default */
     bool                    include_uuid;           /*!< EIR data include UUID, false by default */
+    bool                    include_name;           /*!< EIR data include device name, true by default */
     uint8_t                 flag;                   /*!< EIR flags, see ESP_BT_EIR_FLAG for details, EIR will not include flag if it is 0, 0 by default */
     uint16_t                manufacturer_len;       /*!< Manufacturer data length, 0 by default */
     uint8_t                 *p_manufacturer_data;   /*!< Manufacturer data point */
@@ -225,6 +246,9 @@ typedef enum {
     ESP_BT_GAP_QOS_CMPL_EVT,                        /*!< QOS complete event */
     ESP_BT_GAP_ACL_CONN_CMPL_STAT_EVT,              /*!< ACL connection complete status event */
     ESP_BT_GAP_ACL_DISCONN_CMPL_STAT_EVT,           /*!< ACL disconnection complete status event */
+    ESP_BT_GAP_SET_PAGE_TO_EVT,                     /*!< Set page timeout event */
+    ESP_BT_GAP_GET_PAGE_TO_EVT,                     /*!< Get page timeout event */
+    ESP_BT_GAP_ACL_PKT_TYPE_CHANGED_EVT,            /*!< Set ACL packet types event */
     ESP_BT_GAP_EVT_MAX,
 } esp_bt_gap_cb_event_t;
 
@@ -237,6 +261,11 @@ typedef enum {
 /** Minimum and Maximum inquiry length*/
 #define ESP_BT_GAP_MIN_INQ_LEN                (0x01)  /*!< Minimum inquiry duration, unit is 1.28s */
 #define ESP_BT_GAP_MAX_INQ_LEN                (0x30)  /*!< Maximum inquiry duration, unit is 1.28s */
+
+/** Minimum, Default and Maximum poll interval **/
+#define ESP_BT_GAP_TPOLL_MIN                  (0x0006) /*!< Minimum poll interval, unit is 625 microseconds */
+#define ESP_BT_GAP_TPOLL_DFT                  (0x0028) /*!< Default poll interval, unit is 625 microseconds */
+#define ESP_BT_GAP_TPOLL_MAX                  (0x1000) /*!< Maximum poll interval, unit is 625 microseconds */
 
 /// GAP state callback parameters
 typedef union {
@@ -347,9 +376,9 @@ typedef union {
      * @brief ESP_BT_GAP_READ_REMOTE_NAME_EVT
      */
     struct read_rmt_name_param {
+        esp_bd_addr_t bda;                     /*!< remote bluetooth device address*/
         esp_bt_status_t stat;                  /*!< read Remote Name status */
         uint8_t rmt_name[ESP_BT_GAP_MAX_BDNAME_LEN + 1]; /*!< Remote device name */
-        esp_bd_addr_t bda;                     /*!< remote bluetooth device address*/
     } read_rmt_name;                        /*!< read Remote Name parameter struct */
 
     /**
@@ -378,6 +407,30 @@ typedef union {
                                                     which from the master to a particular slave on the ACL
                                                     logical transport. unit is 0.625ms. */
     } qos_cmpl;                                /*!< QoS complete parameter struct */
+
+    /**
+     * @brief ESP_BT_GAP_SET_PAGE_TO_EVT
+     */
+    struct page_to_set_param {
+        esp_bt_status_t stat;                   /*!< set page timeout status*/
+    } set_page_timeout;                         /*!< set page timeout parameter struct */
+
+    /**
+     * @brief ESP_BT_GAP_GET_PAGE_TO_EVT
+     */
+    struct page_to_get_param {
+        esp_bt_status_t stat;                   /*!< get page timeout status*/
+        uint16_t page_to;                       /*!< page_timeout value to be set, unit is 0.625ms. */
+    } get_page_timeout;                         /*!< get page timeout parameter struct */
+
+    /**
+     * @brief ESP_BT_GAP_ACL_PKT_TYPE_CHANGED_EVT
+     */
+    struct set_acl_pkt_types_param {
+        esp_bt_status_t status;                 /*!< set ACL packet types status */
+        esp_bd_addr_t bda;                      /*!< remote bluetooth device address */
+        uint16_t pkt_types;                     /*!< packet types successfully set */
+    } set_acl_pkt_types;                        /*!< set ACL packet types parameter struct */
 
     /**
      * @brief ESP_BT_GAP_ACL_CONN_CMPL_STAT_EVT
@@ -502,7 +555,7 @@ esp_err_t esp_bt_gap_set_scan_mode(esp_bt_connection_mode_t c_mode, esp_bt_disco
 /**
  * @brief           This function starts Inquiry and Name Discovery. This function should be called after esp_bluedroid_enable() completes successfully.
  *                  When Inquiry is halted and cached results do not contain device name, then Name Discovery will connect to the peer target to get the device name.
- *                  esp_bt_gap_cb_t will be called with ESP_BT_GAP_DISC_STATE_CHANGED_EVT when Inquriry is started or Name Discovery is completed.
+ *                  esp_bt_gap_cb_t will be called with ESP_BT_GAP_DISC_STATE_CHANGED_EVT when Inquiry is started or Name Discovery is completed.
  *                  esp_bt_gap_cb_t will be called with ESP_BT_GAP_DISC_RES_EVT each time the two types of discovery results are got.
  *
  * @param[in]       mode - Inquiry mode
@@ -699,7 +752,6 @@ esp_err_t esp_bt_gap_set_pin(esp_bt_pin_type_t pin_type, uint8_t pin_code_len, e
 */
 esp_err_t esp_bt_gap_pin_reply(esp_bd_addr_t bd_addr, bool accept, uint8_t pin_code_len, esp_bt_pin_code_t pin_code);
 
-#if (BT_SSP_INCLUDED == TRUE)
 /**
 * @brief            Set a GAP security parameter value. Overrides the default value.
 *
@@ -748,8 +800,6 @@ esp_err_t esp_bt_gap_ssp_passkey_reply(esp_bd_addr_t bd_addr, bool accept, uint3
 */
 esp_err_t esp_bt_gap_ssp_confirm_reply(esp_bd_addr_t bd_addr, bool accept);
 
-#endif /*(BT_SSP_INCLUDED == TRUE)*/
-
 /**
 * @brief            Set the AFH channels
 *
@@ -792,6 +842,46 @@ esp_err_t esp_bt_gap_read_remote_name(esp_bd_addr_t remote_bda);
 *
 */
 esp_err_t esp_bt_gap_set_qos(esp_bd_addr_t remote_bda, uint32_t t_poll);
+
+/**
+ * @brief           Set the page timeout
+ *                  esp_bt_gap_cb_t will be called with ESP_BT_GAP_SET_PAGE_TO_EVT
+ *                  after set page timeout ends. The value to be set will not be effective util the
+ *                  next page procedure, it's suggested to set the page timeout before initiating
+ *                  a connection.
+ *
+ * @param[in]       page_to: Page timeout, the maximum time the master will wait for a
+                             Base-band page response from the remote device at a locally
+                             initiated connection attempt. The valid range is 0x0016 ~ 0xffff,
+                             the default value is 0x2000, unit is 0.625ms.
+ *
+ * @return          - ESP_OK: success
+ *                  - ESP_ERR_INVALID_STATE: if bluetooth stack is not yet enabled
+ *                  - other: failed
+ */
+esp_err_t esp_bt_gap_set_page_timeout(uint16_t page_to);
+
+/**
+ * @brief           Get the page timeout
+ *                  esp_bt_gap_cb_t will be called with ESP_BT_GAP_GET_PAGE_TO_EVT
+ *                  after get page timeout ends
+ *
+ * @return          - ESP_OK: success
+ *                  - ESP_ERR_INVALID_STATE: if bluetooth stack is not yet enabled
+ *                  - other: failed
+ */
+esp_err_t esp_bt_gap_get_page_timeout(void);
+
+/**
+ * @brief           Set ACL packet types
+ *                  An ESP_BT_GAP_SET_ACL_PPKT_TYPES_EVT event will reported to
+ *                  the APP layer.
+ *
+ * @return          - ESP_OK: success
+ *                  - ESP_ERR_INVALID_STATE: if bluetooth stack is not yet enabled
+ *                  - other: failed
+ */
+esp_err_t esp_bt_gap_set_acl_pkt_types(esp_bd_addr_t remote_bda, esp_bt_acl_pkt_type_t pkt_types);
 
 #ifdef __cplusplus
 }

@@ -11,7 +11,9 @@ extern "C" {
 
 #include <stddef.h>
 #include "sdkconfig.h"
+#include "esp_heap_caps.h"
 #include "esp_err.h"
+#include "freertos/FreeRTOS.h"
 
 // Forward declaration. Definition in linenoise/linenoise.h.
 typedef struct linenoiseCompletions linenoiseCompletions;
@@ -22,6 +24,7 @@ typedef struct linenoiseCompletions linenoiseCompletions;
 typedef struct {
     size_t max_cmdline_length;  //!< length of command line buffer, in bytes
     size_t max_cmdline_args;    //!< maximum number of command line arguments to parse
+    uint32_t heap_alloc_caps;   //!< where to (e.g. MALLOC_CAP_SPIRAM) allocate heap objects such as cmds used by esp_console
     int hint_color;             //!< ASCII color code of hint text
     int hint_bold;              //!< Set to 1 to print hint text in bold
 } esp_console_config_t;
@@ -30,12 +33,13 @@ typedef struct {
  * @brief Default console configuration value
  *
  */
-#define ESP_CONSOLE_CONFIG_DEFAULT() \
-    {                                \
-        .max_cmdline_length = 256,   \
-        .max_cmdline_args = 32,      \
-        .hint_color = 39,            \
-        .hint_bold = 0               \
+#define ESP_CONSOLE_CONFIG_DEFAULT()           \
+    {                                          \
+        .max_cmdline_length = 256,             \
+        .max_cmdline_args = 32,                \
+        .heap_alloc_caps = MALLOC_CAP_DEFAULT, \
+        .hint_color = 39,                      \
+        .hint_bold = 0                         \
     }
 
 /**
@@ -47,6 +51,7 @@ typedef struct {
     const char *history_save_path; //!< file path used to save history commands, set to NULL won't save to file system
     uint32_t task_stack_size;      //!< repl task stack size
     uint32_t task_priority;        //!< repl task priority
+    BaseType_t task_core_id;       //!< repl task affinity, i.e. which core the task is pinned to
     const char *prompt;            //!< prompt (NULL represents default: "esp> ")
     size_t max_cmdline_length;     //!< maximum length of a command line. If 0, default value will be used
 } esp_console_repl_config_t;
@@ -61,10 +66,12 @@ typedef struct {
         .history_save_path = NULL,        \
         .task_stack_size = 4096,          \
         .task_priority = 2,               \
+        .task_core_id = tskNO_AFFINITY,   \
         .prompt = NULL,                   \
         .max_cmdline_length = 0,          \
 }
 
+#if CONFIG_ESP_CONSOLE_UART_DEFAULT || CONFIG_ESP_CONSOLE_UART_CUSTOM
 /**
  * @brief Parameters for console device: UART
  *
@@ -76,7 +83,7 @@ typedef struct {
     int rx_gpio_num; //!< GPIO number for RX path, -1 means using default one
 } esp_console_dev_uart_config_t;
 
-#ifdef CONFIG_ESP_CONSOLE_UART_CUSTOM
+#if CONFIG_ESP_CONSOLE_UART_CUSTOM
 #define ESP_CONSOLE_DEV_UART_CONFIG_DEFAULT()       \
 {                                                   \
     .channel = CONFIG_ESP_CONSOLE_UART_NUM,         \
@@ -92,8 +99,10 @@ typedef struct {
     .tx_gpio_num = -1,                             \
     .rx_gpio_num = -1,                             \
 }
-#endif
+#endif // CONFIG_ESP_CONSOLE_UART_CUSTOM
+#endif // CONFIG_ESP_CONSOLE_UART_DEFAULT || CONFIG_ESP_CONSOLE_UART_CUSTOM
 
+#if CONFIG_ESP_CONSOLE_USB_CDC || (defined __DOXYGEN__ && SOC_USB_OTG_SUPPORTED)
 /**
  * @brief Parameters for console device: USB CDC
  *
@@ -104,11 +113,10 @@ typedef struct {
 
 } esp_console_dev_usb_cdc_config_t;
 
-#define ESP_CONSOLE_DEV_CDC_CONFIG_DEFAULT() \
-{                                            \
-}
+#define ESP_CONSOLE_DEV_CDC_CONFIG_DEFAULT() {}
+#endif // CONFIG_ESP_CONSOLE_USB_CDC || (defined __DOXYGEN__ && SOC_USB_OTG_SUPPORTED)
 
-#if CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG
+#if CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG || (defined __DOXYGEN__ && SOC_USB_SERIAL_JTAG_SUPPORTED)
 /**
  * @brief Parameters for console device: USB-SERIAL-JTAG
  *
@@ -120,8 +128,7 @@ typedef struct {
 } esp_console_dev_usb_serial_jtag_config_t;
 
 #define ESP_CONSOLE_DEV_USB_SERIAL_JTAG_CONFIG_DEFAULT() {}
-
-#endif // CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG
+#endif // CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG || (defined __DOXYGEN__ && SOC_USB_SERIAL_JTAG_SUPPORTED)
 
 /**
  * @brief initialize console module
@@ -153,6 +160,15 @@ esp_err_t esp_console_deinit(void);
 typedef int (*esp_console_cmd_func_t)(int argc, char **argv);
 
 /**
+ * @brief Console command main function, with context
+ * @param context a user context given at invocation
+ * @param argc number of arguments
+ * @param argv array with argc entries, each pointing to a zero-terminated string argument
+ * @return console command return code, 0 indicates "success"
+ */
+typedef int (*esp_console_cmd_func_with_context_t)(void *context, int argc, char **argv);
+
+/**
  * @brief Console command description
  */
 typedef struct {
@@ -175,6 +191,7 @@ typedef struct {
     const char *hint;
     /**
      * Pointer to a function which implements the command.
+     * @note: Setting both \c func and \c func_w_context is not allowed.
      */
     esp_console_cmd_func_t func;
     /**
@@ -184,17 +201,43 @@ typedef struct {
      * Only used for the duration of esp_console_cmd_register call.
      */
     void *argtable;
+    /**
+     * Pointer to a context aware function which implements the command.
+     * @note: Setting both \c func and \c func_w_context is not allowed.
+     */
+    esp_console_cmd_func_with_context_t func_w_context;
 } esp_console_cmd_t;
 
 /**
  * @brief Register console command
  * @param cmd pointer to the command description; can point to a temporary value
+ *
+ * @note If the member func_w_context of cmd is set instead of func, then there
+ *       MUST be a subsequent call to \c esp_console_cmd_set_context to initialize the
+ *       function context before it is used!
+ *
  * @return
  *      - ESP_OK on success
  *      - ESP_ERR_NO_MEM if out of memory
  *      - ESP_ERR_INVALID_ARG if command description includes invalid arguments
+ *      - ESP_ERR_INVALID_ARG if both func and func_w_context members of cmd are non-NULL
+ *      - ESP_ERR_INVALID_ARG if both func and func_w_context members of cmd are NULL
  */
 esp_err_t esp_console_cmd_register(const esp_console_cmd_t *cmd);
+
+/**
+ * @brief Register context for a command registered with \c func_w_context before
+ *
+ *        \c context is only used if \c func_w_context has been set in the structure
+ *        passed to esp_console_cmd_register()
+ * @param cmd pointer to the command name
+ * @param context pointer to user-defined per-command context data
+ * @return
+ *      - ESP_OK on success
+ *      - ESP_ERR_NOT_FOUND if command was not found
+ *      - ESP_ERR_INVALID_ARG if invalid arguments
+ */
+esp_err_t esp_console_cmd_set_context(const char *cmd, void *context);
 
 /**
  * @brief Run command line
@@ -271,7 +314,9 @@ const char *esp_console_get_hint(const char *buf, int *color, int *bold);
  * @brief Register a 'help' command
  *
  * Default 'help' command prints the list of registered commands along with
- * hints and help strings.
+ * hints and help strings if no additional argument is given. If an additional
+ * argument is given, the help command will look for a command with the same
+ * name and only print the hints and help strings of that command.
  *
  * @return
  *      - ESP_OK on success
@@ -304,6 +349,7 @@ struct esp_console_repl_s {
     esp_err_t (*del)(esp_console_repl_t *repl);
 };
 
+#if CONFIG_ESP_CONSOLE_UART_DEFAULT || CONFIG_ESP_CONSOLE_UART_CUSTOM
 /**
  * @brief Establish a console REPL environment over UART driver
  *
@@ -311,7 +357,7 @@ struct esp_console_repl_s {
  * @param[in] repl_config REPL configuration
  * @param[out] ret_repl return REPL handle after initialization succeed, return NULL otherwise
  *
- * @note This is a all-in-one function to establish the environment needed for REPL, includes:
+ * @note This is an all-in-one function to establish the environment needed for REPL, includes:
  *       - Install the UART driver on the console UART (8n1, 115200, REF_TICK clock source)
  *       - Configures the stdin/stdout to go through the UART driver
  *       - Initializes linenoise
@@ -326,7 +372,9 @@ struct esp_console_repl_s {
  *      - ESP_FAIL Parameter error
  */
 esp_err_t esp_console_new_repl_uart(const esp_console_dev_uart_config_t *dev_config, const esp_console_repl_config_t *repl_config, esp_console_repl_t **ret_repl);
+#endif // CONFIG_ESP_CONSOLE_UART_DEFAULT || CONFIG_ESP_CONSOLE_UART_CUSTOM
 
+#if CONFIG_ESP_CONSOLE_USB_CDC || (defined __DOXYGEN__ && SOC_USB_OTG_SUPPORTED)
 /**
  * @brief Establish a console REPL environment over USB CDC
  *
@@ -347,8 +395,9 @@ esp_err_t esp_console_new_repl_uart(const esp_console_dev_uart_config_t *dev_con
  *      - ESP_FAIL Parameter error
  */
 esp_err_t esp_console_new_repl_usb_cdc(const esp_console_dev_usb_cdc_config_t *dev_config, const esp_console_repl_config_t *repl_config, esp_console_repl_t **ret_repl);
+#endif // CONFIG_ESP_CONSOLE_USB_CDC || (defined __DOXYGEN__ && SOC_USB_OTG_SUPPORTED)
 
-#if CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG
+#if CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG || (defined __DOXYGEN__ && SOC_USB_SERIAL_JTAG_SUPPORTED)
 /**
  * @brief Establish a console REPL (Read-eval-print loop) environment over USB-SERIAL-JTAG
  *
@@ -356,7 +405,7 @@ esp_err_t esp_console_new_repl_usb_cdc(const esp_console_dev_usb_cdc_config_t *d
  * @param[in] repl_config REPL configuration
  * @param[out] ret_repl return REPL handle after initialization succeed, return NULL otherwise
  *
- * @note This is a all-in-one function to establish the environment needed for REPL, includes:
+ * @note This is an all-in-one function to establish the environment needed for REPL, includes:
  *       - Initializes linenoise
  *       - Spawn new thread to run REPL in the background
  *
@@ -369,12 +418,12 @@ esp_err_t esp_console_new_repl_usb_cdc(const esp_console_dev_usb_cdc_config_t *d
  *      - ESP_FAIL Parameter error
  */
 esp_err_t esp_console_new_repl_usb_serial_jtag(const esp_console_dev_usb_serial_jtag_config_t *dev_config, const esp_console_repl_config_t *repl_config, esp_console_repl_t **ret_repl);
-#endif // CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG
+#endif // CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG || (defined __DOXYGEN__ && SOC_USB_SERIAL_JTAG_SUPPORTED)
 
 /**
  * @brief Start REPL environment
  * @param[in] repl REPL handle returned from esp_console_new_repl_xxx
- * @note Once the REPL got started, it won't be stopped until user call repl->del(repl) to destory the REPL environment.
+ * @note Once the REPL gets started, it won't be stopped until the user calls repl->del(repl) to destroy the REPL environment.
  * @return
  *      - ESP_OK on success
  *      - ESP_ERR_INVALID_STATE, if repl has started already

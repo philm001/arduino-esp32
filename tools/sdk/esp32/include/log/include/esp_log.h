@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2015-2021 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2015-2022 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -9,19 +9,9 @@
 
 #include <stdint.h>
 #include <stdarg.h>
+#include <inttypes.h>
 #include "sdkconfig.h"
 #include "esp_rom_sys.h"
-#if CONFIG_IDF_TARGET_ESP32
-#include "esp32/rom/ets_sys.h" // will be removed in idf v5.0
-#elif CONFIG_IDF_TARGET_ESP32S2
-#include "esp32s2/rom/ets_sys.h"
-#elif CONFIG_IDF_TARGET_ESP32S3
-#include "esp32s3/rom/ets_sys.h"
-#elif CONFIG_IDF_TARGET_ESP32C3
-#include "esp32c3/rom/ets_sys.h"
-#elif CONFIG_IDF_TARGET_ESP32H2
-#include "esp32h2/rom/ets_sys.h"
-#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -51,14 +41,39 @@ typedef int (*vprintf_like_t)(const char *, va_list);
  */
 extern esp_log_level_t esp_log_default_level;
 
+#if defined(CONFIG_LOG_MASTER_LEVEL) || __DOXYGEN__
+
+/**
+ * @brief Master log level.
+ *
+ * Optional master log level to check against for ESP_LOGx macros before calling
+ * esp_log_write. Allows one to set a higher CONFIG_LOG_MAXIMUM_LEVEL but not
+ * impose a performance hit during normal operation (only when instructed). An
+ * application may set esp_log_set_level_master(level) to globally enforce a
+ * maximum log level. ESP_LOGx macros above this level will be skipped immediately,
+ * rather than calling esp_log_write and doing a cache hit.
+ *
+ * The tradeoff is increased application size.
+ *
+ * @param level  Master log level
+ */
+void esp_log_set_level_master(esp_log_level_t level);
+
+/**
+ * @brief Returns master log level.
+ * @return Master log level
+ */
+esp_log_level_t esp_log_get_level_master(void);
+
+#endif //CONFIG_LOG_MASTER_LEVEL
+
 /**
  * @brief Set log level for given tag
  *
  * If logging for given component has already been enabled, changes previous setting.
  *
- * Note that this function can not raise log level above the level set using
+ * @note Note that this function can not raise log level above the level set using
  * CONFIG_LOG_MAXIMUM_LEVEL setting in menuconfig.
- *
  * To raise log level above the default one for a given file, define
  * LOG_LOCAL_LEVEL to one of the ESP_LOG_* values, before including
  * esp_log.h in this file.
@@ -72,7 +87,7 @@ extern esp_log_level_t esp_log_default_level;
 void esp_log_level_set(const char* tag, esp_log_level_t level);
 
 /**
- * @brief Get log level for given tag, can be used to avoid expensive log statements
+ * @brief Get log level for a given tag, can be used to avoid expensive log statements
  *
  * @param tag Tag of the log to query current level. Must be a non-NULL zero terminated
  *            string.
@@ -119,8 +134,8 @@ uint32_t esp_log_timestamp(void);
  * 0 on startup, this can be set to the correct time with an SNTP sync,
  * or manually with standard POSIX time functions.
  *
- * Currently this will not get used in logging from binary blobs
- * (i.e WiFi & Bluetooth libraries), these will still print the RTOS tick time.
+ * Currently, this will not get used in logging from binary blobs
+ * (i.e. Wi-Fi & Bluetooth libraries), these will still print the RTOS tick time.
  *
  * @return timestamp, in "HH:MM:SS.sss"
  */
@@ -210,7 +225,7 @@ void esp_log_writev(esp_log_level_t level, const char* tag, const char* format, 
  *      W (195) log_example: 0x3ffb4290   77 6f 72 6b 69 6e 67 20  61 6c 6f 6e 67 20 77 69  |working along wi|
  *      W (205) log_example: 0x3ffb42a0   74 68 20 74 68 65 20 49  44 46 2e 00              |th the IDF..|
  *
- * It is highly recommend to use terminals with over 102 text width.
+ * It is highly recommended to use terminals with over 102 text width.
  *
  * @param tag description tag
  * @param buffer Pointer to the buffer array
@@ -290,16 +305,16 @@ void esp_log_writev(esp_log_level_t level, const char* tag, const char* format, 
 #define LOG_RESET_COLOR
 #endif //CONFIG_LOG_COLORS
 
-#define LOG_FORMAT(letter, format)  LOG_COLOR_ ## letter #letter " (%u) %s: " format LOG_RESET_COLOR "\n"
+#define LOG_FORMAT(letter, format)  LOG_COLOR_ ## letter #letter " (%" PRIu32 ") %s: " format LOG_RESET_COLOR "\n"
 #define LOG_SYSTEM_TIME_FORMAT(letter, format)  LOG_COLOR_ ## letter #letter " (%s) %s: " format LOG_RESET_COLOR "\n"
 
 /** @endcond */
 
-/// macro to output logs in startup code, before heap allocator and syscalls have been initialized. log at ``ESP_LOG_ERROR`` level. @see ``printf``,``ESP_LOGE``,``ESP_DRAM_LOGE``
-#define portGET_ARGUMENT_COUNT_INNER(zero, one, count, ...) count
+/// macro to output logs in startup code, before heap allocator and syscalls have been initialized.
+/// Log at ``ESP_LOG_ERROR`` level. @see ``printf``,``ESP_LOGE``,``ESP_DRAM_LOGE``
 
 /**
- * In the future, we want to switch to C++20. We also want to become compatible with clang.
+ * In the future, we want to become compatible with clang.
  * Hence, we provide two versions of the following macros which are using variadic arguments.
  * The first one is using the GNU extension \#\#__VA_ARGS__. The second one is using the C++20 feature __VA_OPT__(,).
  * This allows users to compile their code with standard C++20 enabled instead of the GNU extension.
@@ -392,8 +407,8 @@ void esp_log_writev(esp_log_level_t level, const char* tag, const char* format, 
  *
  * @param tag tag of the log, which can be used to change the log level by ``esp_log_level_set`` at runtime.
  * @param level level of the output log.
- * @param format format of the output log. see ``printf``
- * @param ... variables to be replaced into the log. see ``printf``
+ * @param format format of the output log. See ``printf``
+ * @param ... variables to be replaced into the log. See ``printf``
  *
  * @see ``printf``
  */
@@ -436,16 +451,22 @@ void esp_log_writev(esp_log_level_t level, const char* tag, const char* format, 
 #endif // !(defined(__cplusplus) && (__cplusplus >  201703L))
 
 /** runtime macro to output logs at a specified level. Also check the level with ``LOG_LOCAL_LEVEL``.
+ * If ``CONFIG_LOG_MASTER_LEVEL`` set, also check first against ``esp_log_get_level_master()``.
  *
  * @see ``printf``, ``ESP_LOG_LEVEL``
  */
+#ifdef CONFIG_LOG_MASTER_LEVEL
+#define ESP_LOG_LEVEL_LOCAL(level, tag, format, ...) do {               \
+        if ( (esp_log_get_level_master() >= level) && (LOG_LOCAL_LEVEL >= level) ) ESP_LOG_LEVEL(level, tag, format, ##__VA_ARGS__); \
+    } while(0)
+#else
 #define ESP_LOG_LEVEL_LOCAL(level, tag, format, ...) do {               \
         if ( LOG_LOCAL_LEVEL >= level ) ESP_LOG_LEVEL(level, tag, format, ##__VA_ARGS__); \
     } while(0)
-
+#endif //CONFIG_LOG_MASTER_LEVEL
 
 /**
- * @brief Macro to output logs when the cache is disabled. log at ``ESP_LOG_ERROR`` level.
+ * @brief Macro to output logs when the cache is disabled. Log at ``ESP_LOG_ERROR`` level.
  *
  * @note Unlike normal logging macros, it's possible to use this macro when interrupts are
  * disabled or inside an ISR.

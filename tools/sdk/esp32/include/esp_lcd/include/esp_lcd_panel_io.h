@@ -10,13 +10,17 @@
 #include "esp_lcd_types.h"
 #include "soc/soc_caps.h"
 #include "hal/lcd_types.h"
+#include "hal/i2c_types.h"
+#include "driver/i2c_types.h"
+
+#define ESP_LCD_I80_BUS_WIDTH_MAX 16 /*!< Maximum width of I80 bus */
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 typedef void *esp_lcd_spi_bus_handle_t;                       /*!< Type of LCD SPI bus handle */
-typedef void *esp_lcd_i2c_bus_handle_t;                       /*!< Type of LCD I2C bus handle */
+typedef uint32_t esp_lcd_i2c_bus_handle_t;                    /*!< Type of LCD I2C bus handle */
 typedef struct esp_lcd_i80_bus_t *esp_lcd_i80_bus_handle_t;   /*!< Type of LCD intel 8080 bus handle */
 
 /**
@@ -41,7 +45,6 @@ typedef bool (*esp_lcd_panel_io_color_trans_done_cb_t)(esp_lcd_panel_io_handle_t
 typedef struct {
     esp_lcd_panel_io_color_trans_done_cb_t on_color_trans_done; /*!< Callback invoked when color data transfer has finished */
 } esp_lcd_panel_io_callbacks_t;
-
 
 /**
  * @brief Transmit LCD command and receive corresponding parameters
@@ -125,7 +128,7 @@ esp_err_t esp_lcd_panel_io_register_event_callbacks(esp_lcd_panel_io_handle_t io
  */
 typedef struct {
     int cs_gpio_num; /*!< GPIO used for CS line */
-    int dc_gpio_num; /*!< GPIO used to select the D/C line, set this to -1 if the D/C line not controlled by manually pulling high/low GPIO */
+    int dc_gpio_num; /*!< GPIO used to select the D/C line, set this to -1 if the D/C line is not used */
     int spi_mode;    /*!< Traditional SPI mode (0~3) */
     unsigned int pclk_hz;    /*!< Frequency of pixel clock */
     size_t trans_queue_depth; /*!< Size of internal transaction queue */
@@ -134,10 +137,12 @@ typedef struct {
     int lcd_cmd_bits;   /*!< Bit-width of LCD command */
     int lcd_param_bits; /*!< Bit-width of LCD parameter */
     struct {
-        unsigned int dc_as_cmd_phase: 1; /*!< D/C line value is encoded into SPI transaction command phase */
         unsigned int dc_low_on_data: 1;  /*!< If this flag is enabled, DC line = 0 means transfer data, DC line = 1 means transfer command; vice versa */
         unsigned int octal_mode: 1;      /*!< transmit with octal mode (8 data lines), this mode is used to simulate Intel 8080 timing */
+        unsigned int quad_mode: 1;       /*!< transmit with quad mode (4 data lines), this mode is useful when transmitting LCD parameters (Only use one line for command) */
+        unsigned int sio_mode: 1; /*!< Read and write through a single data line (MOSI) */
         unsigned int lsb_first: 1;       /*!< transmit LSB bit first */
+        unsigned int cs_high_active: 1;  /*!< CS line is high active */
     } flags; /*!< Extra flags to fine-tune the SPI device */
 } esp_lcd_panel_io_spi_config_t;
 
@@ -170,10 +175,43 @@ typedef struct {
         unsigned int dc_low_on_data: 1;  /*!< If this flag is enabled, DC line = 0 means transfer data, DC line = 1 means transfer command; vice versa */
         unsigned int disable_control_phase: 1; /*!< If this flag is enabled, the control phase isn't used */
     } flags; /*!< Extra flags to fine-tune the I2C device */
+    uint32_t scl_speed_hz; /*!< I2C LCD SCL frequency (hz) */
 } esp_lcd_panel_io_i2c_config_t;
 
 /**
- * @brief Create LCD panel IO handle, for I2C interface
+ * @brief Create LCD panel IO handle, for I2C interface in legacy implementation
+ *
+ * @param[in] bus I2C bus handle, (in uint32_t)
+ * @param[in] io_config IO configuration, for I2C interface
+ * @param[out] ret_io Returned IO handle
+ *
+ * @note Please don't call this function in your project directly. Please call `esp_lcd_new_panel_to_i2c` instead.
+ *
+ * @return
+ *          - ESP_ERR_INVALID_ARG   if parameter is invalid
+ *          - ESP_ERR_NO_MEM        if out of memory
+ *          - ESP_OK                on success
+ */
+esp_err_t esp_lcd_new_panel_io_i2c_v1(uint32_t bus, const esp_lcd_panel_io_i2c_config_t *io_config, esp_lcd_panel_io_handle_t *ret_io);
+
+/**
+ * @brief Create LCD panel IO handle, for I2C interface in new implementation
+ *
+ * @param[in] bus I2C bus handle, (in i2c_master_dev_handle_t)
+ * @param[in] io_config IO configuration, for I2C interface
+ * @param[out] ret_io Returned IO handle
+ *
+ * @note Please don't call this function in your project directly. Please call `esp_lcd_new_panel_to_i2c` instead.
+ *
+ * @return
+ *          - ESP_ERR_INVALID_ARG   if parameter is invalid
+ *          - ESP_ERR_NO_MEM        if out of memory
+ *          - ESP_OK                on success
+ */
+esp_err_t esp_lcd_new_panel_io_i2c_v2(i2c_master_bus_handle_t bus, const esp_lcd_panel_io_i2c_config_t *io_config, esp_lcd_panel_io_handle_t *ret_io);
+
+/**
+ * @brief Create LCD panel IO handle
  *
  * @param[in] bus I2C bus handle
  * @param[in] io_config IO configuration, for I2C interface
@@ -183,7 +221,9 @@ typedef struct {
  *          - ESP_ERR_NO_MEM        if out of memory
  *          - ESP_OK                on success
  */
-esp_err_t esp_lcd_new_panel_io_i2c(esp_lcd_i2c_bus_handle_t bus, const esp_lcd_panel_io_i2c_config_t *io_config, esp_lcd_panel_io_handle_t *ret_io);
+#define esp_lcd_new_panel_io_i2c(bus, io_config, ret_io) _Generic((bus),  \
+            i2c_master_bus_handle_t : esp_lcd_new_panel_io_i2c_v2, \
+            default : esp_lcd_new_panel_io_i2c_v1) (bus, io_config, ret_io) \
 
 #if SOC_LCD_I80_SUPPORTED
 /**
@@ -193,7 +233,7 @@ typedef struct {
     int dc_gpio_num; /*!< GPIO used for D/C line */
     int wr_gpio_num; /*!< GPIO used for WR line */
     lcd_clock_source_t clk_src; /*!< Clock source for the I80 LCD peripheral */
-    int data_gpio_nums[SOC_LCD_I80_BUS_WIDTH]; /*!< GPIOs used for data lines */
+    int data_gpio_nums[ESP_LCD_I80_BUS_WIDTH_MAX]; /*!< GPIOs used for data lines */
     size_t bus_width;          /*!< Number of data lines, 8 or 16 */
     size_t max_transfer_bytes; /*!< Maximum transfer size, this determines the length of internal DMA link */
     size_t psram_trans_align;  /*!< DMA transfer alignment for data allocated from PSRAM */
@@ -229,7 +269,7 @@ esp_err_t esp_lcd_del_i80_bus(esp_lcd_i80_bus_handle_t bus);
  */
 typedef struct {
     int cs_gpio_num;         /*!< GPIO used for CS line, set to -1 will declaim exclusively use of I80 bus */
-    unsigned int pclk_hz;    /*!< Frequency of pixel clock */
+    uint32_t pclk_hz;        /*!< Frequency of pixel clock */
     size_t trans_queue_depth; /*!< Transaction queue size, larger queue, higher throughput */
     esp_lcd_panel_io_color_trans_done_cb_t on_color_trans_done; /*!< Callback invoked when color data was transferred done */
     void *user_ctx;    /*!< User private data, passed directly to on_color_trans_done's user_ctx */

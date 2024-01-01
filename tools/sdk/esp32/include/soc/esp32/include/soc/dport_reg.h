@@ -1,16 +1,8 @@
-// Copyright 2015-2016 Espressif Systems (Shanghai) PTE LTD
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+ * SPDX-FileCopyrightText: 2015-2022 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 #ifndef _SOC_DPORT_REG_H_
 #define _SOC_DPORT_REG_H_
 
@@ -179,9 +171,6 @@
 #define DPORT_CPUPERIOD_SEL_M  ((DPORT_CPUPERIOD_SEL_V)<<(DPORT_CPUPERIOD_SEL_S))
 #define DPORT_CPUPERIOD_SEL_V  0x3
 #define DPORT_CPUPERIOD_SEL_S  0
-#define DPORT_CPUPERIOD_SEL_80		0
-#define DPORT_CPUPERIOD_SEL_160		1
-#define DPORT_CPUPERIOD_SEL_240		2
 
 #define DPORT_PRO_CACHE_CTRL_REG          (DR_REG_DPORT_BASE + 0x040)
 /* DPORT_PRO_DRAM_HL : R/W ;bitpos:[16] ;default: 1'b0 ; */
@@ -1088,8 +1077,10 @@
 #define DPORT_RW_BTMAC_RST     BIT(9)
 #define DPORT_RW_BTLP_RST      BIT(10)
 
+//ESP32 should not reset FE in esp_wifi_bt_power_domain_on().
+//The FE of ESP32 is not in the WIFI PD power domain.
+//When turning off WIFI PD, the FE will not power down, so phy_wakeup_init() did not rewrite the FE register.
 #define MODEM_RESET_FIELD_WHEN_PU   (DPORT_WIFIBB_RST       | \
-                                     DPORT_FE_RST           | \
                                      DPORT_WIFIMAC_RST      | \
                                      DPORT_BTBB_RST         | \
                                      DPORT_BTMAC_RST        | \

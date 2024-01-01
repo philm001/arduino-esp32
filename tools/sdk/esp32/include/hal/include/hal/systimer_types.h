@@ -1,16 +1,8 @@
-// Copyright 2020 Espressif Systems (Shanghai) PTE LTD
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+ * SPDX-FileCopyrightText: 2020-2022 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
 #pragma once
 
@@ -26,6 +18,7 @@ extern "C" {
  * @brief The structure of the counter value in systimer
  *
  */
+#if SOC_SYSTIMER_SUPPORTED
 typedef struct {
     union {
         struct {
@@ -39,9 +32,12 @@ typedef struct {
     };
 } systimer_counter_value_t;
 
+
 /** @cond */
 ESP_STATIC_ASSERT(sizeof(systimer_counter_value_t) == 8, "systimer_counter_value_t should occupy 8 bytes in memory");
 /** @endcond */
+
+#endif
 
 /**
  * @brief systimer alarm mode

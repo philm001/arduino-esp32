@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2021-2022 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2021-2023 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -124,15 +124,25 @@ esp_err_t esp_lcd_panel_disp_on_off(esp_lcd_panel_handle_t panel, bool on_off);
 /**
  * @brief Turn off the display
  *
- * @deprecated This function has similar functionality to `esp_lcd_panel_disp_on_off`.
- *
  * @param[in] panel LCD panel handle, which is created by other factory API like `esp_lcd_new_panel_st7789()`
  * @param[in] off Whether to turn off the screen
  * @return
  *          - ESP_OK on success
  *          - ESP_ERR_NOT_SUPPORTED if this function is not supported by the panel
  */
-esp_err_t esp_lcd_panel_disp_off(esp_lcd_panel_handle_t panel, bool off);
+esp_err_t esp_lcd_panel_disp_off(esp_lcd_panel_handle_t panel, bool off)
+__attribute__((deprecated("use esp_lcd_panel_disp_on_off instead")));
+
+/**
+ * @brief Enter or exit sleep mode
+ *
+ * @param[in] panel LCD panel handle, which is created by other factory API like `esp_lcd_new_panel_st7789()`
+ * @param[in] sleep True to enter sleep mode, False to wake up
+ * @return
+ *          - ESP_OK on success
+ *          - ESP_ERR_NOT_SUPPORTED if this function is not supported by the panel
+ */
+esp_err_t esp_lcd_panel_disp_sleep(esp_lcd_panel_handle_t panel, bool sleep);
 
 #ifdef __cplusplus
 }
